@@ -1,80 +1,128 @@
+// =============================
+// Parking Scanner V1
+// =============================
 
-const API =
-"https://script.google.com/macros/s/AKfycbzq08x-NGwfGhsmVRx1tNe9lbcNvwEBQPvWbMBdDCRZlw2HvNu6SprAdcE_kFu_vvuRJQ/exec";
+const API = "https://script.google.com/macros/s/AKfycbzq08x-NGwfGhsmVRx1tNe9lbcNvwEBQPvWbMBdDCRZlw2HvNu6SprAdcE_kFu_vvuRJQ/exec";
 
-const result=document.getElementById("result");
+const result = document.getElementById("result");
 
-let scanning=true;
+let scanning = true;
 
-function onScanSuccess(decodedText){
+// Called when QR code is scanned
+function onScanSuccess(decodedText) {
 
-if(!scanning)return;
+    if (!scanning) return;
 
-scanning=false;
+    scanning = false;
 
-fetch(API+"?id="+encodeURIComponent(decodedText))
+    result.innerHTML = "<h2>Loading...</h2>";
 
-.then(r=>r.json())
+    loadParking(decodedText);
+}
 
-.then(data=>{
+// =============================
+// JSONP Request
+// =============================
+function loadParking(passID) {
 
-if(data.success){
+    // Remove previous JSONP script if any
+    const oldScript = document.getElementById("jsonpScript");
+    if (oldScript) {
+        oldScript.remove();
+    }
 
-result.innerHTML=`
+    const script = document.createElement("script");
 
-<h2>✅ PASS VERIFIED</h2>
+    script.id = "jsonpScript";
 
-<p><b>Pass:</b> ${data.pass}</p>
+    script.src =
+        API +
+        "?id=" + encodeURIComponent(passID) +
+        "&callback=showResult";
 
-<p><b>Name:</b> ${data.fullname}</p>
+    script.onerror = function () {
 
-<p><b>Slot:</b> ${data.slot}</p>
+        result.innerHTML = `
+            <h2>❌ Server Error</h2>
+            <p>Unable to contact the API.</p>
+        `;
 
-<p><b>Status:</b> ${data.status}</p>
+        scanning = true;
+    };
 
-<p><b>Expiry:</b> ${new Date(data.expiry).toLocaleDateString()}</p>
-
-`;
-
-}else{
-
-result.innerHTML="<h2>❌ Pass Not Found</h2>";
+    document.body.appendChild(script);
 
 }
 
-})
-.catch(()=>{
+// =============================
+// API Callback
+// =============================
+function showResult(data) {
 
-result.innerHTML="<h2>Server Error</h2>";
+    if (data.success) {
 
-})
+        const expiry = new Date(data.expiry);
 
-.finally(()=>{
+        result.innerHTML = `
+            <h2 style="color:green;">✅ PASS VERIFIED</h2>
 
-setTimeout(()=>{
+            <p><b>Pass ID</b><br>${data.pass}</p>
 
-scanning=true;
+            <p><b>Name</b><br>${data.fullname}</p>
 
-},3000);
+            <p><b>Plate</b><br>${data.plate || "-"}</p>
 
-});
+            <p><b>Parking Slot</b><br>${data.slot}</p>
+
+            <p><b>Status</b><br>${data.status}</p>
+
+            <p><b>Expiry</b><br>${expiry.toLocaleDateString()}</p>
+
+            <br>
+
+            <button onclick="scanAgain()">
+                Scan Again
+            </button>
+        `;
+
+    } else {
+
+        result.innerHTML = `
+            <h2 style="color:red;">❌ PASS NOT FOUND</h2>
+
+            <button onclick="scanAgain()">
+                Scan Again
+            </button>
+        `;
+
+    }
 
 }
 
-const qr=new Html5QrcodeScanner(
+// =============================
+// Scan Again
+// =============================
+function scanAgain() {
 
-"reader",
+    result.innerHTML = "<p>Scan a Parking QR Code</p>";
 
-{
+    scanning = true;
 
-fps:10,
+}
 
-qrbox:250
-
-},
-
-false
-
+// =============================
+// Start Scanner
+// =============================
+const html5QrcodeScanner = new Html5QrcodeScanner(
+    "reader",
+    {
+        fps: 10,
+        qrbox: {
+            width: 250,
+            height: 250
+        }
+    },
+    false
 );
 
-qr.render(onScanSuccess);
+html5QrcodeScanner.render(onScanSuccess);
